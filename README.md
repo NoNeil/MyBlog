@@ -1,2 +1,2 @@
 # MyBlog
-My blog powered by hexo.
+Source code of my blog, powered by hexo.
