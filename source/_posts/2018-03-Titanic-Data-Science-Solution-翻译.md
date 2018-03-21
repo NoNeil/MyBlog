@@ -199,5 +199,57 @@ Output:
 * 儿童(Age小于多少)更有可能存活。
 * 舱位等级越高的乘客(Pclass=1)更有可能幸存下来。
 
+## 分别分析各个特征
+* Pclass，这个特征具有明显的相关性，Pclass=1的幸存率>0.5(Classifying#3)。可以在模型中使用这个特性。
+* Sex，女性的幸存率很高，达到74%（Classifying）
+* SibSp和Parch，没有相关性。最好从这些特性(Creating#1)派生一个特性或一组特性。
+
+**Pclass**
+```python
+train_df[['Pclass', 'Survived']]
+  .groupby(['Pclass'], as_index=False)
+  .mean()
+  .sort_values(by='Survived', ascending=False)
+```
+Output:
+
+||Pclass|	Survived|
+|-|-|-|
+|0|	1|	0.629630|
+|1|	2|	0.472826|
+|2|	3|	0.242363|
+
+**Sex**
+```python
+train_df[["Sex", "Survived"]]
+  .groupby(['Sex'], as_index=False)
+  .mean()
+  .sort_values(by='Survived', ascending=False)
+```
+Output:
+
+||	Sex|	Survived|
+|-|-|-|
+|0|	female|	0.742038|
+|1|	male|	0.188908|
+
+**SibSp**
+```python
+train_df[["SibSp", "Survived"]]
+  .groupby(['SibSp'], as_index=False)
+  .mean()
+  .sort_values(by='Survived', ascending=False)
+```
+Output:
+
+||	SibSp|	Survived|
+|-|-|-|
+|1|	1|	0.535885|
+|2|	2|	0.464286|
+|0|	0|	0.345395|
+|3|	3|	0.250000|
+|4|	4|	0.166667|
+|5|	5|	0.000000|
+|6|	8|	0.000000|
 
 未完待续...
