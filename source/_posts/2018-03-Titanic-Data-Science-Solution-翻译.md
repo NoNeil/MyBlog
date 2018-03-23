@@ -207,9 +207,9 @@ Output:
 **Pclass**
 ```python
 train_df[['Pclass', 'Survived']]
-  .groupby(['Pclass'], as_index=False)
-  .mean()
-  .sort_values(by='Survived', ascending=False)
+    .groupby(['Pclass'], as_index=False)
+    .mean()
+    .sort_values(by='Survived', ascending=False)
 ```
 Output:
 
@@ -222,9 +222,9 @@ Output:
 **Sex**
 ```python
 train_df[["Sex", "Survived"]]
-  .groupby(['Sex'], as_index=False)
-  .mean()
-  .sort_values(by='Survived', ascending=False)
+    .groupby(['Sex'], as_index=False)
+    .mean()
+    .sort_values(by='Survived', ascending=False)
 ```
 Output:
 
@@ -236,9 +236,9 @@ Output:
 **SibSp**
 ```python
 train_df[["SibSp", "Survived"]]
-  .groupby(['SibSp'], as_index=False)
-  .mean()
-  .sort_values(by='Survived', ascending=False)
+    .groupby(['SibSp'], as_index=False)
+    .mean()
+    .sort_values(by='Survived', ascending=False)
 ```
 Output:
 
@@ -251,5 +251,156 @@ Output:
 |4|	4|	0.166667|
 |5|	5|	0.000000|
 |6|	8|	0.000000|
+
+
+## 通过可视化来分析
+
+### 校正数值型特征
+对于特征『Age』，使用`sns.FacetGrid`分析：
+```python
+g = sns.FacetGrid(train_df, col='Survived')
+g.map(plt.hist, 'Age', bins=20)
+```
+Output:
+
+![Distribution of Age](./facetgrid_age.png "Distribution of Age")
+
+从图中观察到：
+* 婴儿（小于4岁）的幸存率很高；
+* 最老的乘客（等于80岁）幸存了；
+* 大量的15-25岁的乘客没幸存；
+* 大部分乘客的年龄分布在15-35岁；
+
+结论：
+* 可以将特征『Age』放到最终的模型中；
+* 『Age』列为空的，需要补全；
+* 可以将『Age』特征进行分段；
+
+### 校正数值型和序数型特征
+对特征『Pclass』进行分析
+```python
+# grid = sns.FacetGrid(train_df, col='Pclass', hue='Survived')
+grid = sns.FacetGrid(train_df, 
+    col='Survived', row='Pclass', 
+    size=2.2, aspect=1.6)
+grid.map(plt.hist, 'Age', alpha=.5, bins=20)
+grid.add_legend();
+```
+
+Output:
+![Distribution of Pclass](./facetgrid_pclass.png "Distribution of Pclass")
+
+从图中观察到：
+* Pclass=3的占大多数，但是大多数都没幸存；
+* 在Pclass=2和Pclass=3中的婴儿，大部分都幸存了；
+* Pclass=1的乘客大多数都幸存了；
+* Pclass在乘客的年龄分布上有所不同。
+
+结论：
+* 考虑将『Pclass』放到最终的模型中。
+
+### 关联分类型特征
+对特征『Embarked』进行分析
+```python
+# grid = sns.FacetGrid(train_df, col='Embarked')
+grid = sns.FacetGrid(train_df, 
+    row='Embarked', size=2.2, aspect=1.6)
+grid.map(sns.pointplot, 
+    'Pclass', 'Survived', 'Sex', palette='deep')
+grid.add_legend()
+```
+Output:
+![](./facetgrid_embarked.png)
+
+可以观察到：
+* 女性乘客的幸存率较高；
+* 对C和Q口而言，Pclass=3的男性比Pclass=2的有更高的幸存率（译者注：从图上显示的是从C口上船的乘客中，男性比女性幸存率高）；
+* 对Pclass=3的男性乘客而言，Embarked对生存率有不同的影响。
+
+结论：
+* 将『Sex』放到最终的模型中；
+* 补全『Embarked』特征，加到模型中。（译者注：没看懂。）
+
+### 关联分类型和数值型特征
+我们还可能希望将分类特性(与非数值)和数字特性关联起来。我们可以考虑关联『Embarked』(非数字分类型)，『Sex』(非数字分类型)，Fare(连续的数值型)，与『Survived』(数字分类型)。
+
+```python
+# grid = sns.FacetGrid(train_df, col='Embarked', hue='Survived', palette={0: 'k', 1: 'w'})
+grid = sns.FacetGrid(train_df, 
+    row='Embarked', col='Survived', size=2.2, aspect=1.6)
+grid.map(sns.barplot, 
+    'Sex', 'Fare', alpha=.5, ci=None)
+grid.add_legend()
+```
+Output:
+![](./facetgrid_sex_fare.png)
+
+可以从图中观察到：
+* 花费高的乘客具有较高的幸存率；
+* 『Embarked』与幸存率有关。
+
+结论：
+* 考虑将『Fare』特征进行分段。
+
+## Wrangle data
+
+### 删除特征
+删除特征『Cabin』和『Ticket』
+```python
+print("Before", train_df.shape, test_df.shape, 
+    combine[0].shape, combine[1].shape)
+
+train_df = train_df.drop(['Ticket', 'Cabin'], axis=1)
+test_df = test_df.drop(['Ticket', 'Cabin'], axis=1)
+combine = [train_df, test_df]
+
+print("After", train_df.shape, test_df.shape, 
+    combine[0].shape, combine[1].shape)
+```
+Output:
+```
+Before (891, 12) (418, 11) (891, 12) (418, 11)
+After (891, 10), (418, 9), (891, 10), (418, 9)
+```
+
+### 创造特征
+我们在放弃『Name』和『PassengerId』的特征之前，想要分析『Name』特征是否可以被设计来提取『title』并测试『title』与幸存之间的关系。
+在下面的代码中，我们使用正则表达式从『Name』特征中提取『Title』特征。
+正则表达式`"\w+\."`匹配第一个单词是`.`结尾的。
+
+```python
+for dataset in combine:
+    dataset['Title'] = dataset.Name.str.extract(' ([A-Za-z]+)\.', 
+    expand=False)
+
+pd.crosstab(train_df['Title'], train_df['Sex'])
+```
+Output:
+
+|Sex|	female|	male|
+|-|-|-|
+|Title|-|-|
+|Capt|	0|	1|
+|Col|	0|	2|
+|Countess|	1|	0|
+|Don|	0|	1|
+|Dr|	1|	6|
+|Jonkheer|	0|	1|
+|Lady|	1|	0|
+|Major|	0|	2|
+|Master|	0|	40|
+|Miss|	182|	0|
+|Mlle|	2|	0|
+|Mme|	1|	0|
+|Mr|	0|	517|
+|Mrs|	125|	0|
+|Ms|	1|	0|
+|Rev|	0|	6|
+|Sir|	0|	1|
+
+观察到:
+* 
+
+
 
 未完待续...
