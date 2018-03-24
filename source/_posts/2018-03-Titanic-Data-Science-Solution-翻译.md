@@ -398,9 +398,478 @@ Output:
 |Rev|	0|	6|
 |Sir|	0|	1|
 
-观察到:
-* 
+上表中存在一些title的数量很少的情况，可以将这些数量很少的title用`Rare`代替：
+```python
+for dataset in combine:
+    dataset['Title'] = dataset['Title'].replace(['Lady', 'Countess','Capt', 'Col',\
+ 	'Don', 'Dr', 'Major', 'Rev', 'Sir', 'Jonkheer', 'Dona'], 'Rare')
 
+    dataset['Title'] = dataset['Title'].replace('Mlle', 'Miss')
+    dataset['Title'] = dataset['Title'].replace('Ms', 'Miss')
+    dataset['Title'] = dataset['Title'].replace('Mme', 'Mrs')
+    
+train_df[['Title', 'Survived']].groupby(['Title'], as_index=False).mean()
+```
+Output:
 
+||	Title|	Survived|
+|-|-|-|
+|0|	Master|	0.575000|
+|1|	Miss|	0.702703|
+|2|	Mr|	0.156673|
+|3|	Mrs|	0.793651|
+|4|	Rare|	0.347826|
 
-未完待续...
+从上表可以观察到：
+* 女性（`Miss`,`Mrs`）的幸存率较高
+
+将上述『Title』特征转换成序列特征
+```python
+title_mapping = {"Mr": 1, "Miss": 2, "Mrs": 3, "Master": 4, "Rare": 5}
+for dataset in combine:
+    dataset['Title'] = dataset['Title'].map(title_mapping)
+    dataset['Title'] = dataset['Title'].fillna(0)
+
+train_df.head()
+```
+
+Output:
+
+||	PassengerId|	Survived|	Pclass|	Name|	Sex|	Age|	SibSp|	Parch|	Fare|	Embarked|	Title|
+|-|-|-|-|-|-|-|-|-|
+|0|	1|	0|	3|	Braund, Mr. Owen Harris|	male|	22.0|	1|	0|	7.2500|	S|	1|
+|1|	2|	1|	1|	Cumings, Mrs. John Bradley (Florence Briggs Th...| female|	38.0|	1|	0|	71.2833|	C|	3|
+|2|	3|	1|	3|	Heikkinen, Miss. Laina|	female|	26.0|	0|	0|	7.9250|	S|	2|
+|3|	4|	1|	1|	Futrelle, Mrs. Jacques Heath (Lily May Peel)|	female|	35.0|	1|	0|	53.1000|	S|	3|
+|4|	5|	0|	3|	Allen, Mr. William Henry|	male|	35.0|	0|	0|	8.0500|	S|	1|
+
+至此，我们可以删除特征『Name』和『PassengerId』。
+
+```python
+train_df = train_df.drop(['Name', 'PassengerId'], axis=1)
+test_df = test_df.drop(['Name'], axis=1)
+combine = [train_df, test_df]
+train_df.shape, test_df.shape
+```
+
+Output:
+```
+((891, 9), (418, 9))
+```
+
+观察到（译者注：这块没看懂）:
+* Most titles band Age groups accurately. For example: Master title has Age mean of 5 years.
+* Survival among Title Age bands varies slightly.
+* Certain titles mostly survived (Mme, Lady, Sir) or did not (Don, Rev, Jonkheer).
+
+### 补全连续的数值型特征
+
+首先补全『Age』特征，考虑三种方法：
+1. 一种简单的方法是在一定的均值和标准差之间生成随机数。
+2. 更准确的猜测缺失值的方法是使用其他相关的特性。在我们的案例中，我们注意到年龄、性别和Pclass之间的相关性。根据Pclass和Gender将数据分为多个子集，然后在子集中取年龄的中值。例如，对于Pclass=0且Gender为male的样本，在Pclass=0且Gender为male的子集中，取Age的中值；然后对于Pclass=0且Gender为female的样本以此类推。。。
+3. **结合方法1和2**。与其直接基于中值法猜测年龄值，不如根据Pclass和Age分类后，再使用均值和标准差之间的随机数。
+
+方法1和方法3将引入随机噪声。实践中，这几个方法略有差异，我们更倾向于方法2.
+
+```python
+# grid = sns.FacetGrid(train_df, col='Pclass', hue='Gender')
+grid = sns.FacetGrid(train_df, 
+    row='Pclass', col='Sex', size=2.2, aspect=1.6)
+grid.map(plt.hist, 'Age', alpha=.5, bins=20)
+grid.add_legend()
+```
+Output:
+![](./facetgrid_complete_age.png)
+
+Pclass有3种取值，Gender有2种取值，初始化一个2*3的数组，用来存储Age的中值：
+```python
+guess_ages = np.zeros((2,3))
+guess_ages
+
+for dataset in combine:
+    for i in range(0, 2):
+        for j in range(0, 3):
+            guess_df = dataset[(dataset['Sex'] == i) & \
+                                  (dataset['Pclass'] == j+1)]['Age'].dropna()
+
+            # age_mean = guess_df.mean()
+            # age_std = guess_df.std()
+            # age_guess = rnd.uniform(age_mean - age_std, age_mean + age_std)
+
+            age_guess = guess_df.median()
+
+            # Convert random age float to nearest .5 age
+            guess_ages[i,j] = int( age_guess/0.5 + 0.5 ) * 0.5
+            
+    for i in range(0, 2):
+        for j in range(0, 3):
+            dataset.loc[ (dataset.Age.isnull()) & (dataset.Sex == i) & (dataset.Pclass == j+1),\
+                    'Age'] = guess_ages[i,j]
+
+    dataset['Age'] = dataset['Age'].astype(int)
+
+#train_df.head()
+```
+
+将年龄分组：
+```python
+train_df['AgeBand'] = pd.cut(train_df['Age'], 5)
+train_df[['AgeBand', 'Survived']]
+    .groupby(['AgeBand'], as_index=False)
+    .mean()
+    .sort_values(by='AgeBand', ascending=True)
+```
+Output:
+
+||	AgeBand|	Survived|
+|-|-|-|
+|0|	(-0.08, 16.0]|	0.550000|
+|1|	(16.0, 32.0]|	0.337374|
+|2|	(32.0, 48.0]|	0.412037|
+|3|	(48.0, 64.0]|	0.434783|
+|4|	(64.0, 80.0]|	0.090909|
+
+将『AgeBand』转换为连续数值型特征：
+```python
+for dataset in combine:    
+    dataset.loc[ dataset['Age'] <= 16, 'Age'] = 0
+    dataset.loc[(dataset['Age'] > 16) & (dataset['Age'] <= 32), 'Age'] = 1
+    dataset.loc[(dataset['Age'] > 32) & (dataset['Age'] <= 48), 'Age'] = 2
+    dataset.loc[(dataset['Age'] > 48) & (dataset['Age'] <= 64), 'Age'] = 3
+    dataset.loc[ dataset['Age'] > 64, 'Age']
+train_df.head()
+```
+
+删除『AgeBand』特征：
+```python
+train_df = train_df.drop(['AgeBand'], axis=1)
+combine = [train_df, test_df]
+train_df.head()
+```
+
+### 组合创造出新的特征
+1. 我们能将『Parch』和『SibSp』组合创造出新的特征『FamilySize』。
+
+```python
+for dataset in combine:
+    dataset['FamilySize'] = dataset['SibSp'] + dataset['Parch'] + 1
+
+train_df[['FamilySize', 'Survived']]
+    .groupby(['FamilySize'], as_index=False)
+    .mean()
+    .sort_values(by='Survived', ascending=False)
+```
+
+Output:
+
+|	|FamilySize|	Survived|
+|-|-|-|
+|3|	4|	0.724138|
+|2|	3|	0.578431|
+|1|	2|	0.552795|
+|6|	7|	0.333333|
+|0|	1|	0.303538|
+|4|	5|	0.200000|
+|5|	6|	0.136364|
+|7|	8|	0.000000|
+|8|	11|	0.000000|
+
+可以观察到，『FamilySize』特征与是否幸存无线性关系。
+
+2. 创造『IsAlone』特征
+```python
+for dataset in combine:
+    dataset['IsAlone'] = 0
+    dataset.loc[dataset['FamilySize'] == 1, 'IsAlone'] = 1
+
+train_df[['IsAlone', 'Survived']]
+    .groupby(['IsAlone'], as_index=False)
+    .mean()
+```
+
+Output:
+
+||	IsAlone|	Survived|
+|-|-|-|
+|0|	0|	0.505650|
+|1|	1|	0.303538|
+
+至此，可以删掉『Parch』、『SibSp』、『FamilySize』特征，保留『IsAlone』特征。
+```python
+train_df = train_df.drop(['Parch', 'SibSp', 'FamilySize'], axis=1)
+test_df = test_df.drop(['Parch', 'SibSp', 'FamilySize'], axis=1)
+combine = [train_df, test_df]
+
+train_df.head()
+```
+
+### 补全分类型特征
+『Embarked』特征具有三种取值:`S`、`Q`、`C`。训练集中有2个样本为空值，我们可以简单地用最多的一种取值代替。
+```python
+freq_port = train_df.Embarked.dropna().mode()[0]
+freq_port
+'S'
+
+for dataset in combine:
+    dataset['Embarked'] = dataset['Embarked'].fillna(freq_port)
+    
+train_df[['Embarked', 'Survived']]
+    .groupby(['Embarked'], as_index=False)
+    .mean()
+    .sort_values(by='Survived', ascending=False)
+```
+
+Output:
+
+||	Embarked|	Survived|
+|-|-|-|
+|0|	C|	0.553571|
+|1|	Q|	0.389610|
+|2|	S|	0.339009|
+
+### 将分类型特征转换成数值型特征
+将『Embarked』特征转换成数值型特征，起个新名字『Port』。
+
+```python
+for dataset in combine:
+    dataset['Embarked'] = dataset['Embarked']
+        .map( {'S': 0, 'C': 1, 'Q': 2} ).astype(int)
+```
+
+### 快速地补全、转换数值型特征
+用中值补全测试数据集『Fare』特征中唯一一个缺失值。
+
+```python
+test_df['Fare'].fillna(
+    test_df['Fare'].dropna().median(), 
+    inplace=True)
+```
+
+创造『FareBand』特征：
+```python
+train_df['FareBand'] = pd.qcut(train_df['Fare'], 4)
+train_df[['FareBand', 'Survived']]
+    .groupby(['FareBand'], as_index=False)
+    .mean()
+    .sort_values(by='FareBand', ascending=True)
+```
+Output:
+
+||	FareBand|	Survived|
+|-|-|-|
+|0|	(-0.001, 7.91]|	0.197309|
+|1|	(7.91, 14.454]|	0.303571|
+|2|	(14.454, 31.0]|	0.454955|
+|3|	(31.0, 512.329]|	0.581081|
+
+可见『FareBand』特征与是否幸存线性有关。
+
+将『FareBand』特征转换成连续数值型特征
+```python
+for dataset in combine:
+    dataset.loc[ dataset['Fare'] <= 7.91, 'Fare'] = 0
+    dataset.loc[(dataset['Fare'] > 7.91) & (dataset['Fare'] <= 14.454), 'Fare'] = 1
+    dataset.loc[(dataset['Fare'] > 14.454) & (dataset['Fare'] <= 31), 'Fare']   = 2
+    dataset.loc[ dataset['Fare'] > 31, 'Fare'] = 3
+    dataset['Fare'] = dataset['Fare'].astype(int)
+
+train_df = train_df.drop(['FareBand'], axis=1)
+combine = [train_df, test_df]
+    
+train_df.head(10)
+```
+
+## 建模、预测、解决问题
+现在我们有60多种预测建模算法可供选择。我们必须了解问题的类型和解决方案的要求，以缩小到我们可以评估的少数几个模型。我们的问题是分类和回归问题。我们想要确定输出(`Survived`)与其他变量或特征(`Sex`、`Age`、`Port`……)之间的关系。我们也在实践一种机器学习方法，称为监督式学习，因为我们正在用给定的数据集训练我们的模型。有了这两个标准——监督学习加分类和回归，我们可以将模型的选择缩小到少数。这些包括:
+* Logistics Regression
+* KNN or k-Nearest Neighbors
+* Support Vector Machines
+* Naive Bayes classifier
+* Decision Tree
+* Random Forrest
+* Perceptron
+* Artificial neural network
+* RVM or Relevance Vector Machine
+
+```python
+X_train = train_df.drop("Survived", axis=1)
+Y_train = train_df["Survived"]
+X_test  = test_df.drop("PassengerId", axis=1).copy()
+X_train.shape, Y_train.shape, X_test.shape
+((891, 8), (891,), (418, 8))
+```
+
+### Logistic Regression
+```python
+# Logistic Regression
+
+logreg = LogisticRegression()
+logreg.fit(X_train, Y_train)
+Y_pred = logreg.predict(X_test)
+acc_log = round(logreg.score(X_train, Y_train) * 100, 2)
+acc_log
+80.359999999999999
+```
+
+我们可以使用`Logistic Regression`来验证我们的假设和创造的特性。这可以通过分析特征的系数来实现。
+
+正系数增加了响应的对数概率(从而增加了概率)，负系数减小了响应的对数概率(从而降低了概率)。
+```python
+coeff_df = pd.DataFrame(train_df.columns.delete(0))
+coeff_df.columns = ['Feature']
+coeff_df["Correlation"] = pd.Series(logreg.coef_[0])
+
+coeff_df.sort_values(by='Correlation', ascending=False)
+```
+Output:
+
+|	|Feature|	Correlation|
+|-|-|-|
+|1|	Sex|	2.201527|
+|5|	Title|	0.398234|
+|2|	Age|	0.287163|
+|4|	Embarked|	0.261762|
+|6|	IsAlone|	0.129140|
+|3|	Fare|	-0.085150|
+|7|	Age*Class|	-0.311200|
+|0|	Pclass|	-0.749007|
+
+* 『Sex』是最高的正系数，表示随着『Sex』值的增加(男性:0，女性:1)，幸存的概率增加最多。
+* 当『Pclass』增加时，幸存的概率减少最多。
+* 这种『Age*Class』是一个很好的人工特征模型，因为它与生存的负相关系数是第二高的。
+* 『Title』是第二高正相关的。
+**译者注：特征的重要性与系数的绝对值大小有关**
+
+### SVM
+```python
+# Support Vector Machines
+
+svc = SVC()
+svc.fit(X_train, Y_train)
+Y_pred = svc.predict(X_test)
+acc_svc = round(svc.score(X_train, Y_train) * 100, 2)
+acc_svc
+83.840000000000003
+```
+
+### KNN
+```python
+knn = KNeighborsClassifier(n_neighbors = 3)
+knn.fit(X_train, Y_train)
+Y_pred = knn.predict(X_test)
+acc_knn = round(knn.score(X_train, Y_train) * 100, 2)
+acc_knn
+84.739999999999995
+```
+
+### Naive Bayes
+```python
+# Gaussian Naive Bayes
+
+gaussian = GaussianNB()
+gaussian.fit(X_train, Y_train)
+Y_pred = gaussian.predict(X_test)
+acc_gaussian = round(gaussian.score(X_train, Y_train) * 100, 2)
+acc_gaussian
+72.280000000000001
+```
+
+### Perceptron
+```python
+# Perceptron
+
+perceptron = Perceptron()
+perceptron.fit(X_train, Y_train)
+Y_pred = perceptron.predict(X_test)
+acc_perceptron = round(perceptron.score(X_train, Y_train) * 100, 2)
+acc_perceptron
+78.0
+```
+
+### Linear SVC
+```python
+# Linear SVC
+
+linear_svc = LinearSVC()
+linear_svc.fit(X_train, Y_train)
+Y_pred = linear_svc.predict(X_test)
+acc_linear_svc = round(linear_svc.score(X_train, Y_train) * 100, 2)
+acc_linear_svc
+79.120000000000005
+```
+
+### Stochastic Gradient Descent
+```python
+sgd = SGDClassifier()
+sgd.fit(X_train, Y_train)
+Y_pred = sgd.predict(X_test)
+acc_sgd = round(sgd.score(X_train, Y_train) * 100, 2)
+acc_sgd
+77.670000000000002
+```
+
+### Decision Tree
+```python
+decision_tree = DecisionTreeClassifier()
+decision_tree.fit(X_train, Y_train)
+Y_pred = decision_tree.predict(X_test)
+acc_decision_tree = round(decision_tree.score(X_train, Y_train) * 100, 2)
+acc_decision_tree
+86.760000000000005
+```
+
+### Random Forest
+```python
+random_forest = RandomForestClassifier(n_estimators=100)
+random_forest.fit(X_train, Y_train)
+Y_pred = random_forest.predict(X_test)
+random_forest.score(X_train, Y_train)
+acc_random_forest = round(random_forest.score(X_train, Y_train) * 100, 2)
+acc_random_forest
+86.760000000000005
+```
+
+### 模型评估
+我们现在可以对所有的模型的结果进行排序，以选出最适合我们的模型。虽然决策树和随机森林得分相同，但我们选择使用随机森林，因为决策树容易过拟合。
+
+```python
+models = pd.DataFrame({
+    'Model': ['Support Vector Machines', 'KNN', 'Logistic Regression', 
+              'Random Forest', 'Naive Bayes', 'Perceptron', 
+              'Stochastic Gradient Decent', 'Linear SVC', 
+              'Decision Tree'],
+    'Score': [acc_svc, acc_knn, acc_log, 
+              acc_random_forest, acc_gaussian, acc_perceptron, 
+              acc_sgd, acc_linear_svc, acc_decision_tree]})
+models.sort_values(by='Score', ascending=False)
+```
+Output:
+
+||	Model|	Score|
+|-|-|-|
+|3|	Random Forest|	86.76|
+|8|	Decision Tree|	86.76|
+|1|	KNN|	84.74|
+|0|	Support Vector Machines|	83.84|
+|2|	Logistic Regression|	80.36|
+|7|	Linear SVC|	79.12|
+|5|	Perceptron|	78.00|
+|6|	Stochastic Gradient Decent|	77.67|
+|4|	Naive Bayes|	72.28|
+
+计算结果
+```python
+submission = pd.DataFrame({
+        "PassengerId": test_df["PassengerId"],
+        "Survived": Y_pred
+    })
+# submission.to_csv('../output/submission.csv', index=False)
+```
+我们提交给比赛网站Kaggle的结果是在6082个样本中命中了3,883个。
+
+参考文献：
+* [A journey through Titanic](https://www.kaggle.com/omarelgabry/titanic/a-journey-through-titanic)
+* [Getting Started with Pandas: Kaggle's Titanic Competition](https://www.kaggle.com/c/titanic/details/getting-started-with-random-forests)
+* [Titanic Best Working Classifier](https://www.kaggle.com/sinakhorami/titanic/titanic-best-working-classifier)
+
+【部分表述有待完善。。。】
