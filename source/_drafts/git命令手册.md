@@ -2,8 +2,8 @@
 title: git命令手册
 date: 2018-03-24 14:14:09
 updated: 2018-03-24 14:14:09
-categories:
-tags:
+categories: git
+tags: git
 ---
 
 **【本博客随时更新】**
