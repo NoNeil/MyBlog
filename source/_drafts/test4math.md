@@ -6,6 +6,7 @@ tags:
 - Hexo
 - NexT
 - mathjax
+date: 2018-03-16 10:10:10
 ---
 
 我安装主题是Next 5.1.4，已经能内嵌了mathjax，所以不需要再安装hexo-math插件。
