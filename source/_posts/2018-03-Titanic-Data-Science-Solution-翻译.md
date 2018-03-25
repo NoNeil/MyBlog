@@ -262,8 +262,7 @@ g = sns.FacetGrid(train_df, col='Survived')
 g.map(plt.hist, 'Age', bins=20)
 ```
 Output:
-
-![Distribution of Age](./facetgrid_age.png "Distribution of Age")
+<img src="./facetgrid_age.png" alt="Distribution of Age" width="500px"/>
 
 从图中观察到：
 * 婴儿（小于4岁）的幸存率很高；
@@ -288,7 +287,7 @@ grid.add_legend();
 ```
 
 Output:
-![Distribution of Pclass](./facetgrid_pclass.png "Distribution of Pclass")
+<img src="./facetgrid_pclass.png" alt="Distribution of Pclass" width="500px"/>
 
 从图中观察到：
 * Pclass=3的占大多数，但是大多数都没幸存；
@@ -310,7 +309,8 @@ grid.map(sns.pointplot,
 grid.add_legend()
 ```
 Output:
-![](./facetgrid_embarked.png)
+<img src="./facetgrid_embarked.png" alt="Distribution of Embarked" width="500px"/>
+
 
 可以观察到：
 * 女性乘客的幸存率较高；
@@ -333,7 +333,7 @@ grid.map(sns.barplot,
 grid.add_legend()
 ```
 Output:
-![](./facetgrid_sex_fare.png)
+<img src="./facetgrid_sex_fare.png" width="500px"/>
 
 可以从图中观察到：
 * 花费高的乘客具有较高的幸存率；
@@ -479,7 +479,7 @@ grid.map(plt.hist, 'Age', alpha=.5, bins=20)
 grid.add_legend()
 ```
 Output:
-![](./facetgrid_complete_age.png)
+<img src="./facetgrid_complete_age.png" width="500px"/>
 
 Pclass有3种取值，Gender有2种取值，初始化一个2*3的数组，用来存储Age的中值：
 ```python
