@@ -22,3 +22,8 @@ $ git rm --cached file1.txt
 $ git commit -m "remove file1.txt"
 $ git push origin branch_name 
 ```
+
+# 修改commit message
+```shell
+$ git commit --amend -m "New commit message"
+```
