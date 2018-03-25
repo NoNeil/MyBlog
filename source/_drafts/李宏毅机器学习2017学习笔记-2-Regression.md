@@ -3,7 +3,7 @@ title: '李宏毅机器学习2017学习笔记:2.Regression'
 date: 2018-03-24 17:52:57
 updated: 2018-03-24 17:52:57
 categories: Machine Learning
-description: 摘要
+description: 回归模型，梯度下降，正则化
 tags: 
 - 李宏毅
 - Machine Learning
@@ -11,26 +11,24 @@ tags:
 - LR
 ---
 
-
 <!-- more --> 
 
-# 回归模型
 
-## 构建最基本的回归模型
-### 1.问题描述：
+# 构建最基本的回归模型
+## 1.问题描述：
 如何根据宝可梦的CP值预测进化后的CP值？
 
-### 2.模型假设：
+## 2.模型假设：
 $$y = b + w * X_{cp}$$
 
 为方便表示和计算，用$w_0$替代$b$，只需要在$X_{cp}$前面添加一维数值`1`，模型变为：
 $$y = w * X_{cp}$$
 
 
-### 3.损失函数：
+## 3.损失函数：
 $$L(f) = L(w) = \frac12 \sum_{i=1}^{10} \left(\hat {y}^i - w · x_{cp}^i\right) ^2$$
 
-### 4.优化方法（梯度下降法）：
+## 4.优化方法（梯度下降法）：
 
 目标函数：
 $$ f^\ast = arg \min_{f}^{} L(f) $$
@@ -52,13 +50,13 @@ $$ \frac {\partial L} {\partial b} = \sum_{i=1}^{10}\left(\hat {y}^i - (b +  w �
 $$w_{t+1} = w_t - \alpha · \frac {\partial L} {\partial w}$$
 其中，$\alpha$为步长。
 
-结果：
+## 5.结果：
 在测试集上的平均误差为35.
 <img src="./one_feature.jpg" width="500px"/>
 
-## 对回归模型进行优化
+# 对回归模型进行优化
 
-### 选择更加复杂的模型
+## 选择更加复杂的模型
 1. 增加一维特征$(X_{cp})^2$
 $$y = b + w_1·X_{cp} + w_2 · (X_{cp})^2$$
 在训练集上和测试集上的平均误差分别15.4和18.4
@@ -95,7 +93,7 @@ $$y = b + w_1·X_{cp} + w_2 · (X_{cp})^2$$
 继续猜测，可能还有隐藏因子，例如『高度』、『体重』等。验证一下，过拟合了！
 <img src="more_hidden_factors.jpg" width="500px">
 
-### 正则化（Regularization）：
+## 正则化（Regularization）：
 以上猜测隐藏因子的方法不一定猜得到，**正则化**一般来说是有用的。
 
 在损失函数后面添加一项对参数的约束：
