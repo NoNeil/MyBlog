@@ -8,7 +8,7 @@ tags:
   - 调参
 date: 2018-03-26 19:56:53
 updated: 2018-03-26 19:56:53
-description:
+description: 使用AdaGrad动态调整learning rate.
 ---
 
 
