@@ -1,5 +1,5 @@
 ---
-title: 李宏毅机器学习2017学习笔记：Bias and Variance
+title: 李宏毅机器学习2017学习笔记:2.Bias and Variance
 description: 如何分析error来自哪里？是bias偏大，还是variance偏大？分别如何解决？最后，使用N折交叉验证来选择模型。
 categories: Machine Learning
 tags:
